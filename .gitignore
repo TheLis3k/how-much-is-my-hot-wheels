@@ -34,3 +34,6 @@ target/
 ### Mac OS / Windows System Files ###
 .DS_Store
 Thumbs.db
+
+# Environment variables
+.env
