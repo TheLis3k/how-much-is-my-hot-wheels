@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: how-much-is-my-hot-wheels
+  data:
+    mongodb:
+      auto-index-creation: true
+  mongodb:
+    uri: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@localhost:27017/${MONGO_DB}?authSource=admin
+
+server:
+  port: 8080
