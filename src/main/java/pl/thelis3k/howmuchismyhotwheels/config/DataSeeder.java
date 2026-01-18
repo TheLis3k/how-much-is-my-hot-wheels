@@ -3,7 +3,6 @@ package pl.thelis3k.howmuchismyhotwheels.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
-import pl.thelis3k.howmuchismyhotwheels.hotwheels.model.HotWheelsCar;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.repository.HotWheelsCarRepository;
 import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.FandomScraper;
 
@@ -17,6 +16,6 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        scraper.scrapeCurrentYear();
+        scraper.scrapeAllYears();
     }
 }

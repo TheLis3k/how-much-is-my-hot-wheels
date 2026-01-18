@@ -16,7 +16,7 @@ public class ScrapingScheduler {
     @Scheduled(cron = "0 0 4 * * MON")
     public void weeklyCheck() {
         log.info("⏰ Uruchamiam tygodniowe sprawdzanie nowości...");
-        fandomScraper.scrapeCurrentYear();
+        fandomScraper.scrapeRecentYears();
     }
 
     @Scheduled(cron = "0 0 3 1 * *")
