@@ -44,7 +44,6 @@ public class FandomScraper {
         try (Playwright playwright = Playwright.create()) {
             log.info("🚀 Uruchamiam Playwright w trybie Stealth...");
 
-            // 1. Stealth Arguments - ukrywamy, że to automat
             BrowserType.LaunchOptions options = new BrowserType.LaunchOptions()
                     .setHeadless(true)
                     .setArgs(List.of(
@@ -53,14 +52,13 @@ public class FandomScraper {
                     ));
 
             Browser browser = playwright.chromium().launch(options);
-            // Tworzymy kontekst z rozmiarem okna (wygląda bardziej jak desktop)
             Page page = browser.newContext(new Browser.NewContextOptions()
                             .setViewportSize(1920, 1080))
                     .newPage();
 
             IntStream.rangeClosed(startYear, endYear).forEach(year -> {
                 scrapeYear(page, year);
-                // 2. Humanizacja - Losowe opóźnienie między 3 a 7 sekund
+                // add humanization
                 sleepRandom(3000, 7000);
             });
 
@@ -77,13 +75,12 @@ public class FandomScraper {
         try {
             page.navigate(url);
 
-            // 3. Symulacja zachowania człowieka
             try {
-                page.mouse().move(100, 200); // Rusz myszką
-                page.mouse().wheel(0, 500);  // Zescrooluj trochę w dół
-                page.waitForTimeout(2000);   // Poczekaj chwilę na załadowanie dynamicznej treści
+                page.mouse().move(100, 200);           //move mouse
+                page.mouse().wheel(0, 500);    //scroll
+                page.waitForTimeout(2000);                  //wait a bit
             } catch (Exception e) {
-                // Ignoruj błędy interakcji, one są tylko dla "zmyłki"
+                // ignore interaction errors
             }
 
             String htmlContent = page.content();
@@ -91,7 +88,7 @@ public class FandomScraper {
 
             if (doc.title().contains("Cloudflare") || doc.title().contains("Challenge") || doc.title().contains("Just a moment")) {
                 log.error("⛔ BLOKADA CLOUDFLARE dla roku {}! Czekam dłużej...", year);
-                sleepRandom(10000, 15000); // Karna pauza 10-15s
+                sleepRandom(10000, 15000);
                 return;
             }
 
@@ -187,7 +184,6 @@ public class FandomScraper {
         for (int i = 0; i < headers.size(); i++) {
             String text = headers.get(i).text().toUpperCase().trim();
 
-            // Zmiana: Dodano "CAR" do wykrywania nazwy (naprawa roku 1970)
             if (text.contains("NAME") || text.contains("MODEL") || text.contains("CAR")) map.put("NAME", i);
             else if (text.contains("SERIES")) map.put("SERIES", i);
             else if (text.contains("TOY") || text.contains("SKU")) map.put("TOY_ID", i);
