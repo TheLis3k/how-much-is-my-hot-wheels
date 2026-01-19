@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.FandomScraper;
+import pl.thelis3k.howmuchismyhotwheels.valuation.service.ValuationService;
 
 @Slf4j
 @Component
@@ -12,6 +13,7 @@ import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.FandomScraper;
 public class ScrapingScheduler {
 
     private final FandomScraper fandomScraper;
+    private final ValuationService valuationService;
 
     @Scheduled(cron = "0 0 4 * * MON")
     public void weeklyCheck() {
@@ -23,5 +25,11 @@ public class ScrapingScheduler {
     public void monthlyFullScan() {
         log.info("⏰ Uruchamiam miesięczny pełny skan wszystkich lat...");
         fandomScraper.scrapeAllYears();
+    }
+
+    @Scheduled(cron = "0 0 4 * * TUE")
+    public void weeklyValuationUpdate() {
+        log.info("⏰ Uruchamiam tygodniowe aktualizacje cen...");
+        valuationService.updateAllValuations();
     }
 }
