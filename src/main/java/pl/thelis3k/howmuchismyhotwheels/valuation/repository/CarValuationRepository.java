@@ -4,10 +4,9 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 import pl.thelis3k.howmuchismyhotwheels.valuation.model.CarValuation;
 
-import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CarValuationRepository extends MongoRepository<CarValuation, String> {
-
-    List<CarValuation> findAllByHotWheelsCarIdOrderByValuationDateDesc(String hotWheelsCarId);
+    Optional<CarValuation> findFirstByHotWheelsCarIdOrderByValuationDateDesc(String hotWheelsCarId);
 }

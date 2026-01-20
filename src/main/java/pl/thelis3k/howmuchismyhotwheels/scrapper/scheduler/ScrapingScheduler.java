@@ -26,10 +26,4 @@ public class ScrapingScheduler {
         log.info("⏰ Uruchamiam miesięczny pełny skan wszystkich lat...");
         fandomScraper.scrapeAllYears();
     }
-
-    @Scheduled(cron = "0 0 4 * * TUE")
-    public void weeklyValuationUpdate() {
-        log.info("⏰ Uruchamiam tygodniowe aktualizacje cen...");
-        valuationService.updateAllValuations();
-    }
 }

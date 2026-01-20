@@ -52,13 +52,10 @@ public class FandomScraper {
                     ));
 
             Browser browser = playwright.chromium().launch(options);
-            Page page = browser.newContext(new Browser.NewContextOptions()
-                            .setViewportSize(1920, 1080))
-                    .newPage();
+            Page page = browser.newContext(new Browser.NewContextOptions().setViewportSize(1920, 1080)).newPage();
 
             IntStream.rangeClosed(startYear, endYear).forEach(year -> {
                 scrapeYear(page, year);
-                // add humanization
                 sleepRandom(3000, 7000);
             });
 
@@ -74,14 +71,11 @@ public class FandomScraper {
 
         try {
             page.navigate(url);
-
             try {
-                page.mouse().move(100, 200);           //move mouse
-                page.mouse().wheel(0, 500);    //scroll
-                page.waitForTimeout(2000);                  //wait a bit
-            } catch (Exception e) {
-                // ignore interaction errors
-            }
+                page.mouse().move(100, 200);
+                page.mouse().wheel(0, 500);
+                page.waitForTimeout(2000);
+            } catch (Exception e) {}
 
             String htmlContent = page.content();
             Document doc = Jsoup.parse(htmlContent);
@@ -107,7 +101,7 @@ public class FandomScraper {
         }
 
         int carsSaved = 0;
-        Set<String> processedInThisRun = new HashSet<>();
+        Set<String> processedNamesInYear = new HashSet<>();
 
         for (Element table : tables) {
             Map<String, Integer> colMap = analyzeHeaders(table);
@@ -123,6 +117,11 @@ public class FandomScraper {
                 if (cols.size() > nameIdx) {
                     try {
                         String name = cols.get(nameIdx).text().trim();
+
+                        if (processedNamesInYear.contains(name)) {
+                            continue;
+                        }
+
                         String toyId = getColumnValue(cols, colMap.get("TOY_ID"));
                         String colNum = getColumnValue(cols, colMap.get("COL_NUM"));
                         String series = getColumnValue(cols, colMap.get("SERIES"));
@@ -130,14 +129,7 @@ public class FandomScraper {
                         if (series == null) series = "Mainline / Unknown";
 
                         if (isValidCarName(name)) {
-                            if (toyId != null && processedInThisRun.contains(toyId)) continue;
-
-                            boolean exists;
-                            if (toyId != null) {
-                                exists = repository.existsByToyId(toyId);
-                            } else {
-                                exists = repository.existsByNameAndReleaseYear(name, year);
-                            }
+                            boolean exists = repository.existsByNameAndReleaseYear(name, year);
 
                             if (!exists) {
                                 HotWheelsCar car = HotWheelsCar.builder()
@@ -149,7 +141,10 @@ public class FandomScraper {
                                         .build();
                                 repository.save(car);
                                 carsSaved++;
-                                if (toyId != null) processedInThisRun.add(toyId);
+
+                                processedNamesInYear.add(name);
+                            } else {
+                                processedNamesInYear.add(name);
                             }
                         }
                     } catch (Exception e) {
@@ -158,7 +153,7 @@ public class FandomScraper {
                 }
             }
         }
-        log.info("💾 Rok {}: Zapisano {} nowych aut.", year, carsSaved);
+        log.info("💾 Rok {}: Zapisano {} nowych (unikalnych) aut.", year, carsSaved);
     }
 
     private String getColumnValue(Elements cols, Integer index) {
@@ -183,7 +178,6 @@ public class FandomScraper {
 
         for (int i = 0; i < headers.size(); i++) {
             String text = headers.get(i).text().toUpperCase().trim();
-
             if (text.contains("NAME") || text.contains("MODEL") || text.contains("CAR")) map.put("NAME", i);
             else if (text.contains("SERIES")) map.put("SERIES", i);
             else if (text.contains("TOY") || text.contains("SKU")) map.put("TOY_ID", i);
