@@ -10,4 +10,5 @@ public class ValuationResponse {
     private PlatformValuation ebay;
     private PlatformValuation etsy;
     private PlatformValuation vinted;
+    private PlatformValuation olx;
 }
