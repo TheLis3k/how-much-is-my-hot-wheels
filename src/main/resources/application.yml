@@ -3,9 +3,12 @@ spring:
     name: how-much-is-my-hot-wheels
   data:
     mongodb:
+      uri: mongodb://admin:password@localhost:27017/hotwheels_db?authSource=admin
       auto-index-creation: true
-  mongodb:
-    uri: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@localhost:27017/${MONGO_DB}?authSource=admin
 
 server:
   port: 8080
+
+etsy:
+  api:
+    key: ${ETSY_API_KEY}

@@ -1,9 +1,6 @@
 package pl.thelis3k.howmuchismyhotwheels.scrapper.engine;
 
-import com.microsoft.playwright.Browser;
-import com.microsoft.playwright.BrowserType;
-import com.microsoft.playwright.Page;
-import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
@@ -29,68 +26,59 @@ import java.util.List;
 public class EbayScraper {
 
     private final PriceCalculator priceCalculator;
-    private static final String SEARCH_URL = "https://www.ebay.com/sch/i.html?_nkw=%s&LH_Sold=1&LH_Complete=1&_ipg=60";
+    private static final String SEARCH_URL = "https://www.ebay.com/sch/i.html?_nkw=%s&_sacat=0&LH_Sold=1&LH_Complete=1";
 
-    public CarValuation valuateCar(HotWheelsCar car) {
-        log.info("💰 [eBay] Wyceniam: {}", car.getName());
-
+    public synchronized CarValuation valuateCar(HotWheelsCar car) {
+        log.info("💰 [eBay Playwright] Wyceniam: {}", car.getName());
         String query = "Hot Wheels " + car.getName();
         List<Offer> extractedOffers = new ArrayList<>();
 
         try (Playwright playwright = Playwright.create()) {
+            boolean isHeadless = Boolean.parseBoolean(System.getenv().getOrDefault("HEADLESS_MODE", "true"));
+
             Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
-                    .setHeadless(true)
+                    .setHeadless(isHeadless)
                     .setArgs(List.of("--disable-blink-features=AutomationControlled")));
 
-            Page page = browser.newPage();
+            BrowserContext context = browser.newContext(new Browser.NewContextOptions()
+                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
+
+            Page page = context.newPage();
 
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
             page.navigate(String.format(SEARCH_URL, encodedQuery));
 
             try {
-                page.waitForSelector(".s-item, .s-card", new Page.WaitForSelectorOptions().setTimeout(5000));
+                page.waitForSelector(".s-item__price", new Page.WaitForSelectorOptions().setTimeout(10000));
             } catch (Exception e) {
-                log.debug("⚠️ Timeout czekania na elementy (może brak wyników).");
+                log.warn("⚠️ [eBay] Timeout oczekiwania na ceny.");
             }
 
             String html = page.content();
             Document doc = Jsoup.parse(html);
-            Elements items = doc.select(".s-item, .s-card");
+            Elements items = doc.select(".s-item");
 
             for (Element item : items) {
-                if (item.text().contains("Shop on eBay") || item.text().contains("Results matching fewer words")) continue;
+                if (item.text().contains("Shop on eBay")) continue;
 
-                boolean isCard = item.hasClass("s-card");
-                String priceText = "";
-                String shippingText = "";
-                String link = "";
+                String priceText = item.select(".s-item__price").text();
+                String link = item.select("a.s-item__link").attr("href");
 
-                if (isCard) {
-                    priceText = item.select(".s-card__price").text();
-                    link = item.select(".s-card__link").attr("href");
-                    for (Element attr : item.select(".su-styled-text")) {
-                        if (attr.text().contains("delivery") || attr.text().contains("shipping")) {
-                            shippingText = attr.text();
-                            break;
-                        }
-                    }
-                } else {
-                    if (item.select(".s-item__price").isEmpty()) continue;
-                    priceText = item.select(".s-item__price").text();
-                    shippingText = item.select(".s-item__shipping").text();
-                    link = item.select(".s-item__link").attr("href");
+                if (priceText.contains(" to ")) {
+                    priceText = priceText.split(" to ")[0];
                 }
 
-                Double itemPrice = parsePrice(priceText);
-                Double shippingPrice = parsePrice(shippingText);
+                Double price = parsePrice(priceText);
 
-                if (itemPrice != null) {
-                    double totalPrice = itemPrice + (shippingPrice != null ? shippingPrice : 0.0);
-                    extractedOffers.add(new Offer(totalPrice, link));
+                if (price != null && price > 1.0 && link != null) {
+                    extractedOffers.add(new Offer(price, link));
                 }
             }
+
+            log.info("✅ [eBay] Znaleziono {} ofert.", extractedOffers.size());
+
         } catch (Exception e) {
-            log.error("❌ Błąd eBay scrapera: {}", e.getMessage());
+            log.error("❌ Błąd eBay: {}", e.getMessage());
         }
 
         ValuationMetrics metrics = priceCalculator.calculate(extractedOffers);
@@ -109,12 +97,10 @@ public class EbayScraper {
     }
 
     private Double parsePrice(String text) {
-        if (text == null || text.isEmpty() || text.toLowerCase().contains("free")) return 0.0;
-        if (text.contains(" to ")) text = text.split(" to ")[0];
-        String cleanNumber = text.replaceAll("[^0-9.,]", "");
-        if (cleanNumber.contains(",") && cleanNumber.contains(".")) cleanNumber = cleanNumber.replace(",", "");
-        else if (cleanNumber.contains(",")) cleanNumber = cleanNumber.replace(",", ".");
-
-        try { return Double.parseDouble(cleanNumber); } catch (Exception e) { return null; }
+        if (text == null || text.isEmpty()) return null;
+        String clean = text.replaceAll("[^0-9.,]", "");
+        if (clean.contains(",") && clean.contains(".")) clean = clean.replace(",", "");
+        else if (clean.contains(",")) clean = clean.replace(",", ".");
+        try { return Double.parseDouble(clean); } catch (Exception e) { return null; }
     }
 }
