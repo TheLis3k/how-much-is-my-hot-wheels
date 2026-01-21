@@ -1,17 +1,17 @@
 package pl.thelis3k.howmuchismyhotwheels.valuation.service;
 
-public record ValuationMetrics(
-        Double min,
-        Double max,
-        String maxLink,
-        Double average,
-        Double smartAverage,
-        Integer count
-) {
-    public record Offer(Double price, String url) implements Comparable<Offer> {
-        @Override
-        public int compareTo(Offer o) {
-            return Double.compare(this.price, o.price);
-        }
-    }
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class ValuationMetrics {
+    private Double min;
+    private Double max;
+    private String maxLink;
+    private Double average;
+    private Double smartAverage;
+    private int count;
+
+    public record Offer(int priceCents, String link) {}
 }

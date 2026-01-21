@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.model.HotWheelsCar;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.repository.HotWheelsCarRepository;
 import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.EbayScraper;
-import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.EtsyApiService;
+//import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.EtsyApiService;
 import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.OlxScraper;
 import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.VintedScraper;
 import pl.thelis3k.howmuchismyhotwheels.valuation.dto.PlatformValuation;
@@ -30,7 +30,7 @@ public class ValuationService {
     private final HotWheelsCarRepository carRepository;
     private final CarValuationRepository valuationRepository;
     private final EbayScraper ebayScraper;
-    private final EtsyApiService etsyApiService;
+//    private final EtsyApiService etsyApiService;
     private final VintedScraper vintedScraper;
     private final OlxScraper olxScraper;
 

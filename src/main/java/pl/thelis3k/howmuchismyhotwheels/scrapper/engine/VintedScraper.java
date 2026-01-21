@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.model.HotWheelsCar;
+import pl.thelis3k.howmuchismyhotwheels.util.PriceUtil;
 import pl.thelis3k.howmuchismyhotwheels.valuation.model.CarValuation;
 import pl.thelis3k.howmuchismyhotwheels.valuation.model.ValuationSource;
 import pl.thelis3k.howmuchismyhotwheels.valuation.service.PriceCalculator;
@@ -52,8 +53,6 @@ public class VintedScraper {
                 } catch (Exception e) {}
 
                 List<ElementHandle> items = page.querySelectorAll("[data-testid='grid-item']");
-                log.info("📄 [Vinted] Znaleziono {} ogłoszeń.", items.size());
-
                 int limit = Math.min(items.size(), 40);
 
                 for (int i = 0; i < limit; i++) {
@@ -78,35 +77,34 @@ public class VintedScraper {
                                 .findFirst()
                                 .orElse("0");
 
-                        priceText = priceText.replaceAll("[^0-9,.]", "").replace(",", ".");
+                        int priceCents = PriceUtil.toCents(priceText);
 
-                        if (!priceText.isEmpty()) {
-                            double price = Double.parseDouble(priceText);
-                            if (price > 1.0) {
-                                offers.add(new Offer(price, link));
-                            }
+                        if (priceCents > 100 && priceCents < 100000) {
+                            offers.add(new Offer(priceCents, link));
                         }
                     } catch (Exception e) {
-                        // ignore parsing errors
+                        // ignore
                     }
                 }
             } catch (Exception e) {
                 log.error("❌ Vinted scrap error: {}", e.getMessage());
+            } finally {
+                browser.close();
             }
         }
 
         ValuationMetrics metrics = priceCalculator.calculate(offers);
-        log.info("✅ [Vinted] Przetworzono {} ofert. Smart Price: {} PLN", metrics.count(), metrics.smartAverage());
+        log.info("✅ [Vinted] Przetworzono {} ofert. Smart Price: {} PLN", metrics.getCount(), metrics.getSmartAverage());
 
         return CarValuation.builder()
                 .hotWheelsCarId(car.getId())
                 .source(ValuationSource.VINTED)
-                .lowestPrice(metrics.min())
-                .highestPrice(metrics.max())
-                .highestPriceLink(metrics.maxLink())
-                .averagePrice(metrics.average())
-                .smartAveragePrice(metrics.smartAverage())
-                .offersCount(metrics.count())
+                .lowestPrice(metrics.getMin())
+                .highestPrice(metrics.getMax())
+                .highestPriceLink(metrics.getMaxLink())
+                .averagePrice(metrics.getAverage())
+                .smartAveragePrice(metrics.getSmartAverage())
+                .offersCount(metrics.getCount())
                 .currency("PLN")
                 .build();
     }
@@ -115,6 +113,10 @@ public class VintedScraper {
         return CarValuation.builder()
                 .hotWheelsCarId(car.getId())
                 .source(ValuationSource.VINTED)
+                .lowestPrice(0.0)
+                .highestPrice(0.0)
+                .averagePrice(0.0)
+                .smartAveragePrice(0.0)
                 .offersCount(0)
                 .currency("PLN")
                 .build();
