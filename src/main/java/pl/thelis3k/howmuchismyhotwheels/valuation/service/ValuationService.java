@@ -10,6 +10,7 @@ import pl.thelis3k.howmuchismyhotwheels.hotwheels.model.HotWheelsCar;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.repository.HotWheelsCarRepository;
 import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.EbayScraper;
 import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.EtsyApiService;
+import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.VintedScraper;
 import pl.thelis3k.howmuchismyhotwheels.valuation.dto.PlatformValuation;
 import pl.thelis3k.howmuchismyhotwheels.valuation.dto.ValuationResponse;
 import pl.thelis3k.howmuchismyhotwheels.valuation.dto.ValuationStatus;
@@ -28,8 +29,8 @@ public class ValuationService {
     private final HotWheelsCarRepository carRepository;
     private final CarValuationRepository valuationRepository;
     private final EbayScraper ebayScraper;
-
     private final EtsyApiService etsyApiService;
+    private final VintedScraper vintedScraper;
 
     @Autowired
     @Lazy
@@ -41,15 +42,17 @@ public class ValuationService {
 
         Optional<CarValuation> ebayVal = valuationRepository.findFirstByHotWheelsCarIdAndSourceOrderByValuationDateDesc(carId, ValuationSource.EBAY);
         Optional<CarValuation> etsyVal = valuationRepository.findFirstByHotWheelsCarIdAndSourceOrderByValuationDateDesc(carId, ValuationSource.ETSY);
+        Optional<CarValuation> vintedVal = valuationRepository.findFirstByHotWheelsCarIdAndSourceOrderByValuationDateDesc(carId, ValuationSource.VINTED);
 
         boolean ebayFresh = isFresh(ebayVal);
         boolean etsyFresh = isFresh(etsyVal);
+        boolean vintedFresh = isFresh(vintedVal);
 
         ValuationStatus globalStatus;
 
-        if (ebayFresh) {
+        if (ebayFresh && vintedFresh) {
             globalStatus = ValuationStatus.FRESH;
-        } else if (ebayVal.isPresent()) {
+        } else if (ebayVal.isPresent() || vintedVal.isPresent()) {
             globalStatus = ValuationStatus.STALE_UPDATING;
             self.triggerBackgroundUpdate(car);
         } else {
@@ -61,7 +64,7 @@ public class ValuationService {
                 .globalStatus(globalStatus)
                 .ebay(ebayVal.map(v -> mapToPlatform(v, ebayFresh)).orElse(null))
                 .etsy(etsyVal.map(v -> mapToPlatform(v, etsyFresh)).orElse(null))
-                // TODO: Tu w przyszłości dojdzie .allegro(...)
+                .vinted(vintedVal.map(v -> mapToPlatform(v, vintedFresh)).orElse(null))
                 .build();
     }
 
@@ -73,7 +76,6 @@ public class ValuationService {
     public void triggerBackgroundUpdate(HotWheelsCar car) {
         log.info("🔄 [Async] Aktualizacja cen dla: {}", car.getName());
 
-        // 1. EBAY (Działa)
         try {
             CarValuation val = ebayScraper.valuateCar(car);
             if (val.getOffersCount() > 0) {
@@ -84,22 +86,15 @@ public class ValuationService {
             log.error("❌ eBay Error: {}", e.getMessage());
         }
 
-        // 2. ETSY (WYŁĄCZONE TYMCZASOWO)
-        /*
         try {
-            Thread.sleep(2000); // Odczekaj chwilę, żeby nie spamować
-            CarValuation val = etsyApiService.valuateCar(car);
+            CarValuation val = vintedScraper.valuateCar(car);
             if (val.getOffersCount() > 0) {
                 valuationRepository.save(val);
-                log.info("✅ Etsy zaktualizowane: {} ofert", val.getOffersCount());
+                log.info("✅ Vinted zaktualizowany: {} ofert", val.getOffersCount());
             }
         } catch (Exception e) {
-            log.error("❌ Etsy Error: {}", e.getMessage());
+            log.error("❌ Vinted Error: {}", e.getMessage());
         }
-        */
-
-        // 3. TODO: ALLEGRO (Tu będzie miejsce na Twój nowy serwis)
-
     }
 
     private PlatformValuation mapToPlatform(CarValuation val, boolean isFresh) {

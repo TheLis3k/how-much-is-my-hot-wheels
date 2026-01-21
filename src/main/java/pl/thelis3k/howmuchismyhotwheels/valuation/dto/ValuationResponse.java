@@ -7,7 +7,7 @@ import lombok.Data;
 @Builder
 public class ValuationResponse {
     private ValuationStatus globalStatus;
-
     private PlatformValuation ebay;
     private PlatformValuation etsy;
+    private PlatformValuation vinted;
 }
