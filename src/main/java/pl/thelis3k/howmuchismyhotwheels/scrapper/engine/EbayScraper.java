@@ -1,6 +1,7 @@
 package pl.thelis3k.howmuchismyhotwheels.scrapper.engine;
 
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.LoadState;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,23 +31,55 @@ public class EbayScraper {
         String url = "https://www.ebay.pl/sch/i.html?_nkw=" + query + "&_sacat=222&_sop=15";
 
         try (Playwright playwright = Playwright.create()) {
-            Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
-            Page page = browser.newPage();
+            Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
+                    .setHeadless(true) // Wracamy do trybu ukrytego
+                    .setArgs(List.of("--disable-blink-features=AutomationControlled")));
+
+            BrowserContext context = browser.newContext(new Browser.NewContextOptions()
+                    .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
+
+            Page page = context.newPage();
 
             try {
                 log.info("🔍 [eBay] Szukam: {}", car.getName());
                 page.navigate(url);
-                page.waitForSelector(".s-item__price", new Page.WaitForSelectorOptions().setTimeout(10000));
 
-                List<ElementHandle> items = page.querySelectorAll(".s-item");
-                int limit = Math.min(items.size(), 40);
+                try {
+                    // Czekamy na załadowanie sieci LUB pojawienie się któregokolwiek kontenera
+                    page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(8000));
+                } catch (TimeoutError e) {
+                    // Ignorujemy timeout sieci, jeśli elementy się załadowały
+                }
 
-                for (int i = 0; i < limit; i++) {
-                    ElementHandle item = items.get(i);
+                // Obsługa starego i nowego widoku eBay
+                String containerSelector = ".s-item, .s-card";
+                Locator items = page.locator(containerSelector);
+
+                int count = items.count();
+                if (count == 0) {
+                    // Ostatnia deska ratunku - czekamy chwilę dłużej na selektor
                     try {
-                        String priceText = item.querySelector(".s-item__price").innerText();
-                        ElementHandle linkEl = item.querySelector("a.s-item__link");
-                        String link = linkEl != null ? linkEl.getAttribute("href") : "";
+                        page.waitForSelector(containerSelector, new Page.WaitForSelectorOptions().setTimeout(5000));
+                        items = page.locator(containerSelector);
+                        count = items.count();
+                    } catch (Exception e) {
+                        log.warn("⚠️ Brak wyników na eBay (timeout).");
+                        return emptyValuation(car);
+                    }
+                }
+
+                for (int i = 0; i < count; i++) {
+                    Locator item = items.nth(i);
+                    try {
+                        // Szukamy ceny w obu formatach
+                        Locator priceLocator = item.locator(".s-item__price, .s-card__price");
+                        if (priceLocator.count() == 0) continue;
+
+                        String priceText = priceLocator.first().innerText();
+
+                        // Link też może mieć różne klasy
+                        Locator linkLocator = item.locator("a.s-item__link, a.s-card__link");
+                        String link = linkLocator.count() > 0 ? linkLocator.first().getAttribute("href") : "";
 
                         if (priceText.contains("do")) {
                             priceText = priceText.split("do")[0];
@@ -80,6 +113,19 @@ public class EbayScraper {
                 .averagePrice(metrics.getAverage())
                 .smartAveragePrice(metrics.getSmartAverage())
                 .offersCount(metrics.getCount())
+                .currency("PLN")
+                .build();
+    }
+
+    private CarValuation emptyValuation(HotWheelsCar car) {
+        return CarValuation.builder()
+                .hotWheelsCarId(car.getId())
+                .source(ValuationSource.EBAY)
+                .lowestPrice(0.0)
+                .highestPrice(0.0)
+                .averagePrice(0.0)
+                .smartAveragePrice(0.0)
+                .offersCount(0)
                 .currency("PLN")
                 .build();
     }
