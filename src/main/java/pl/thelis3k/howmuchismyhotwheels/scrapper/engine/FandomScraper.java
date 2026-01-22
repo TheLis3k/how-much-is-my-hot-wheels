@@ -42,14 +42,11 @@ public class FandomScraper {
 
     private void runScraper(int startYear, int endYear) {
         try (Playwright playwright = Playwright.create()) {
-            log.info("🚀 Uruchamiam Playwright w trybie Stealth...");
+            log.info("🚀 Uruchamiam Playwright...");
 
             BrowserType.LaunchOptions options = new BrowserType.LaunchOptions()
                     .setHeadless(true)
-                    .setArgs(List.of(
-                            "--disable-blink-features=AutomationControlled",
-                            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                    ));
+                    .setArgs(List.of("--disable-blink-features=AutomationControlled"));
 
             Browser browser = playwright.chromium().launch(options);
             Page page = browser.newContext(new Browser.NewContextOptions().setViewportSize(1920, 1080)).newPage();
@@ -71,11 +68,14 @@ public class FandomScraper {
 
         try {
             page.navigate(url);
+
             try {
                 page.mouse().move(100, 200);
                 page.mouse().wheel(0, 500);
                 page.waitForTimeout(2000);
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                log.warn("⚠️ Problem z symulacją ruchu myszy dla roku {}: {}", year, e.getMessage());
+            }
 
             String htmlContent = page.content();
             Document doc = Jsoup.parse(htmlContent);
@@ -129,7 +129,12 @@ public class FandomScraper {
                         if (series == null) series = "Mainline / Unknown";
 
                         if (isValidCarName(name)) {
-                            boolean exists = repository.existsByNameAndReleaseYear(name, year);
+                            boolean exists;
+                            if (toyId != null) {
+                                exists = repository.existsByToyId(toyId);
+                            } else {
+                                exists = repository.existsByNameAndReleaseYear(name, year);
+                            }
 
                             if (!exists) {
                                 HotWheelsCar car = HotWheelsCar.builder()
@@ -141,14 +146,13 @@ public class FandomScraper {
                                         .build();
                                 repository.save(car);
                                 carsSaved++;
-
                                 processedNamesInYear.add(name);
                             } else {
                                 processedNamesInYear.add(name);
                             }
                         }
                     } catch (Exception e) {
-                        // ignore row error
+                        log.error("Błąd przetwarzania wiersza: ", e);
                     }
                 }
             }

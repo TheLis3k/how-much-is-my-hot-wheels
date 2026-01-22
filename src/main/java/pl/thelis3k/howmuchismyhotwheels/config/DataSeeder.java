@@ -25,6 +25,6 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // empty
+//        fandomScraper.scrapeAllYears();
     }
 }

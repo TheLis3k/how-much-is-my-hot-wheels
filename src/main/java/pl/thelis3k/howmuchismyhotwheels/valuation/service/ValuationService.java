@@ -20,6 +20,9 @@ import pl.thelis3k.howmuchismyhotwheels.valuation.repository.CarValuationReposit
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -31,6 +34,8 @@ public class ValuationService {
     private final EbayScraper ebayScraper;
     private final VintedScraper vintedScraper;
     private final OlxScraper olxScraper;
+
+    private final Set<String> processingCars = ConcurrentHashMap.newKeySet();
 
     @Autowired
     @Lazy
@@ -57,12 +62,16 @@ public class ValuationService {
         if (ebayFresh && vintedFresh && olxFresh) {
             globalStatus = ValuationStatus.FRESH;
         } else {
+            boolean isProcessing = processingCars.contains(carId);
+
             globalStatus = (ebayVal.isPresent() || vintedVal.isPresent() || olxVal.isPresent())
                     ? ValuationStatus.STALE_UPDATING
                     : ValuationStatus.NOT_FOUND_UPDATING;
 
-            if (triggerUpdate) {
+            if (triggerUpdate && !isProcessing) {
                 self.triggerBackgroundUpdate(car);
+            } else if (isProcessing) {
+                log.debug("⏳ Auto {} jest już w trakcie wyceny. Pomijam duplikat zlecenia.", car.getName());
             }
         }
 
@@ -80,22 +89,32 @@ public class ValuationService {
 
     @Async
     public void triggerBackgroundUpdate(HotWheelsCar car) {
+        String carId = car.getId();
+        if (!processingCars.add(carId)) {
+            return;
+        }
+
         log.info("🔄 [Async] START scrapowania dla: {}", car.getName());
 
         try {
-            CarValuation val = ebayScraper.valuateCar(car);
-            if (val.getOffersCount() > 0) valuationRepository.save(val);
-        } catch (Exception e) { log.error("❌ eBay Error: {}", e.getMessage()); }
+            scrapeAndSave(car, "eBay", () -> ebayScraper.valuateCar(car));
+            scrapeAndSave(car, "Vinted", () -> vintedScraper.valuateCar(car));
+            scrapeAndSave(car, "OLX", () -> olxScraper.valuateCar(car));
+        } finally {
+            processingCars.remove(carId);
+            log.info("✅ [Async] KONIEC scrapowania dla: {}", car.getName());
+        }
+    }
 
+    private void scrapeAndSave(HotWheelsCar car, String sourceName, Supplier<CarValuation> scraperCall) {
         try {
-            CarValuation val = vintedScraper.valuateCar(car);
-            if (val.getOffersCount() > 0) valuationRepository.save(val);
-        } catch (Exception e) { log.error("❌ Vinted Error: {}", e.getMessage()); }
-
-        try {
-            CarValuation val = olxScraper.valuateCar(car);
-            if (val.getOffersCount() > 0) valuationRepository.save(val);
-        } catch (Exception e) { log.error("❌ OLX Error: {}", e.getMessage()); }
+            CarValuation val = scraperCall.get();
+            if (val != null && val.getOffersCount() > 0) {
+                valuationRepository.save(val);
+            }
+        } catch (Exception e) {
+            log.error("❌ Błąd scrapowania {}: {}", sourceName, e.getMessage());
+        }
     }
 
     private PlatformValuation mapToPlatform(CarValuation val, boolean isFresh) {
