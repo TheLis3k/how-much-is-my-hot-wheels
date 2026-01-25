@@ -126,25 +126,20 @@ public class FandomScraper {
                         if (isValidCarName(name)) {
                             Optional<HotWheelsCar> existingCarOpt = Optional.empty();
 
-                            // 1. Najpierw szukamy po unikalnym toyId
                             if (toyId != null && !toyId.isEmpty()) {
                                 existingCarOpt = repository.findByToyId(toyId);
                             }
 
-                            // 2. Jeśli nie ma toyId (lub nie znaleziono), szukamy GLOBALNIE po nazwie
-                            // (niezależnie od roku wydania)
                             if (existingCarOpt.isEmpty()) {
                                 existingCarOpt = repository.findByName(name);
                             }
 
                             if (existingCarOpt.isPresent()) {
-                                // Jeśli auto istnieje (kolejna wersja/rok), inkrementujemy wersję
                                 HotWheelsCar existing = existingCarOpt.get();
                                 existing.setVersions(existing.getVersions() + 1);
                                 repository.save(existing);
                                 versionsUpdated++;
                             } else {
-                                // Nowe auto - zapisujemy z wersją 1
                                 HotWheelsCar car = HotWheelsCar.builder()
                                         .name(name)
                                         .series(series)
@@ -190,8 +185,6 @@ public class FandomScraper {
             String text = headers.get(i).text().toUpperCase().trim();
             if (text.contains("NAME") || text.contains("MODEL") || text.contains("CAR")) map.put("NAME", i);
             else if (text.contains("SERIES")) {
-                // Wykluczamy kolumny z numerami serii (Series #, Series Number, No.)
-                // Szukamy czystej nazwy serii
                 if (!text.contains("#") && !text.contains("NUM") && !text.contains("NO.")) {
                     map.put("SERIES", i);
                 }

@@ -45,19 +45,16 @@ public class EbayScraper {
                 page.navigate(url);
 
                 try {
-                    // Czekamy na załadowanie sieci LUB pojawienie się któregokolwiek kontenera
                     page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(8000));
                 } catch (TimeoutError e) {
                     // Ignorujemy timeout sieci, jeśli elementy się załadowały
                 }
 
-                // Obsługa starego i nowego widoku eBay
                 String containerSelector = ".s-item, .s-card";
                 Locator items = page.locator(containerSelector);
 
                 int count = items.count();
                 if (count == 0) {
-                    // Ostatnia deska ratunku - czekamy chwilę dłużej na selektor
                     try {
                         page.waitForSelector(containerSelector, new Page.WaitForSelectorOptions().setTimeout(5000));
                         items = page.locator(containerSelector);
@@ -71,13 +68,11 @@ public class EbayScraper {
                 for (int i = 0; i < count; i++) {
                     Locator item = items.nth(i);
                     try {
-                        // Szukamy ceny w obu formatach
                         Locator priceLocator = item.locator(".s-item__price, .s-card__price");
                         if (priceLocator.count() == 0) continue;
 
                         String priceText = priceLocator.first().innerText();
 
-                        // Link też może mieć różne klasy
                         Locator linkLocator = item.locator("a.s-item__link, a.s-card__link");
                         String link = linkLocator.count() > 0 ? linkLocator.first().getAttribute("href") : "";
 
