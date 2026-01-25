@@ -11,6 +11,9 @@ import java.util.Optional;
 @Repository
 public interface HotWheelsCarRepository extends MongoRepository<HotWheelsCar, String> {
     Optional<HotWheelsCar> findByName(String name);
+    Optional<HotWheelsCar> findByNameAndReleaseYear(String name, Integer releaseYear);
+    Optional<HotWheelsCar> findByToyId(String toyId);
+
     boolean existsByToyId(String toyId);
     boolean existsByNameAndReleaseYear(String name, Integer releaseYear);
     List<HotWheelsCar> findByReleaseYearOrderByNameAsc(Integer releaseYear);

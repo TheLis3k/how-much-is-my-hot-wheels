@@ -28,5 +28,8 @@ public class HotWheelsCar {
     private String collectionNumber;
 
     @Builder.Default
+    private Integer versions = 1;
+
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 }

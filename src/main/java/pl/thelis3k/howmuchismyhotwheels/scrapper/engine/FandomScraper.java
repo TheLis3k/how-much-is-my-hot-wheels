@@ -101,7 +101,7 @@ public class FandomScraper {
         }
 
         int carsSaved = 0;
-        Set<String> processedNamesInYear = new HashSet<>();
+        int versionsUpdated = 0;
 
         for (Element table : tables) {
             Map<String, Integer> colMap = analyzeHeaders(table);
@@ -117,11 +117,6 @@ public class FandomScraper {
                 if (cols.size() > nameIdx) {
                     try {
                         String name = cols.get(nameIdx).text().trim();
-
-                        if (processedNamesInYear.contains(name)) {
-                            continue;
-                        }
-
                         String toyId = getColumnValue(cols, colMap.get("TOY_ID"));
                         String colNum = getColumnValue(cols, colMap.get("COL_NUM"));
                         String series = getColumnValue(cols, colMap.get("SERIES"));
@@ -129,26 +124,37 @@ public class FandomScraper {
                         if (series == null) series = "Mainline / Unknown";
 
                         if (isValidCarName(name)) {
-                            boolean exists;
-                            if (toyId != null) {
-                                exists = repository.existsByToyId(toyId);
-                            } else {
-                                exists = repository.existsByNameAndReleaseYear(name, year);
+                            Optional<HotWheelsCar> existingCarOpt = Optional.empty();
+
+                            // 1. Najpierw szukamy po unikalnym toyId
+                            if (toyId != null && !toyId.isEmpty()) {
+                                existingCarOpt = repository.findByToyId(toyId);
                             }
 
-                            if (!exists) {
+                            // 2. Jeśli nie ma toyId (lub nie znaleziono), szukamy GLOBALNIE po nazwie
+                            // (niezależnie od roku wydania)
+                            if (existingCarOpt.isEmpty()) {
+                                existingCarOpt = repository.findByName(name);
+                            }
+
+                            if (existingCarOpt.isPresent()) {
+                                // Jeśli auto istnieje (kolejna wersja/rok), inkrementujemy wersję
+                                HotWheelsCar existing = existingCarOpt.get();
+                                existing.setVersions(existing.getVersions() + 1);
+                                repository.save(existing);
+                                versionsUpdated++;
+                            } else {
+                                // Nowe auto - zapisujemy z wersją 1
                                 HotWheelsCar car = HotWheelsCar.builder()
                                         .name(name)
                                         .series(series)
                                         .releaseYear(year)
                                         .toyId(toyId)
                                         .collectionNumber(colNum)
+                                        .versions(1)
                                         .build();
                                 repository.save(car);
                                 carsSaved++;
-                                processedNamesInYear.add(name);
-                            } else {
-                                processedNamesInYear.add(name);
                             }
                         }
                     } catch (Exception e) {
@@ -157,7 +163,7 @@ public class FandomScraper {
                 }
             }
         }
-        log.info("💾 Rok {}: Zapisano {} nowych (unikalnych) aut.", year, carsSaved);
+        log.info("💾 Rok {}: Nowych aut: {}, Zaktualizowanych wersji: {}", year, carsSaved, versionsUpdated);
     }
 
     private String getColumnValue(Elements cols, Integer index) {
@@ -183,7 +189,13 @@ public class FandomScraper {
         for (int i = 0; i < headers.size(); i++) {
             String text = headers.get(i).text().toUpperCase().trim();
             if (text.contains("NAME") || text.contains("MODEL") || text.contains("CAR")) map.put("NAME", i);
-            else if (text.contains("SERIES")) map.put("SERIES", i);
+            else if (text.contains("SERIES")) {
+                // Wykluczamy kolumny z numerami serii (Series #, Series Number, No.)
+                // Szukamy czystej nazwy serii
+                if (!text.contains("#") && !text.contains("NUM") && !text.contains("NO.")) {
+                    map.put("SERIES", i);
+                }
+            }
             else if (text.contains("TOY") || text.contains("SKU")) map.put("TOY_ID", i);
             else if (text.contains("COL") || text.contains("NUMBER")) map.put("COL_NUM", i);
         }
