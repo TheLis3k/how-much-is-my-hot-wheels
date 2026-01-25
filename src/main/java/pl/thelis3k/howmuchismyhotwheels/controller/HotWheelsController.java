@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import pl.thelis3k.howmuchismyhotwheels.controller.dto.DatabaseStatsResponse;
 import pl.thelis3k.howmuchismyhotwheels.controller.dto.FullCarDetailsResponse;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.model.HotWheelsCar;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.repository.HotWheelsCarRepository;
 import pl.thelis3k.howmuchismyhotwheels.valuation.dto.ValuationResponse;
+import pl.thelis3k.howmuchismyhotwheels.valuation.repository.CarValuationRepository;
 import pl.thelis3k.howmuchismyhotwheels.valuation.service.ValuationService;
 
 import java.util.List;
@@ -21,10 +23,20 @@ public class HotWheelsController {
 
     private final HotWheelsCarRepository carRepository;
     private final ValuationService valuationService;
+    private final CarValuationRepository carValuationRepository;
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> healthCheck() {
         return ResponseEntity.ok(Map.of("status", "UP"));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<DatabaseStatsResponse> getDatabaseStats() {
+        Long valuedCount = carValuationRepository.countDistinctCarsValuedByEbay();
+        return ResponseEntity.ok(DatabaseStatsResponse.builder()
+                .totalCars(carRepository.count())
+                .valuedCars(valuedCount != null ? valuedCount : 0L)
+                .build());
     }
 
     @GetMapping("/years")

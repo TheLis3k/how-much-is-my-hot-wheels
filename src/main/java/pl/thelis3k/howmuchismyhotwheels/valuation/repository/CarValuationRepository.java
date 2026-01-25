@@ -1,5 +1,6 @@
 package pl.thelis3k.howmuchismyhotwheels.valuation.repository;
 
+import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 import pl.thelis3k.howmuchismyhotwheels.valuation.model.CarValuation;
@@ -20,4 +21,11 @@ public interface CarValuationRepository extends MongoRepository<CarValuation, St
     Optional<CarValuation> findTopByOrderBySmartAveragePriceDesc();
 
     Optional<CarValuation> findTopByOrderBySmartAveragePriceAsc();
+
+    @Aggregation(pipeline = {
+            "{ '$match': { 'source': 'EBAY' } }",
+            "{ '$group': { '_id': '$hotWheelsCarId' } }",
+            "{ '$count': 'total' }"
+    })
+    Long countDistinctCarsValuedByEbay();
 }
