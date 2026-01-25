@@ -1,6 +1,7 @@
 package pl.thelis3k.howmuchismyhotwheels.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import pl.thelis3k.howmuchismyhotwheels.controller.dto.FullCarDetailsResponse;
@@ -11,6 +12,7 @@ import pl.thelis3k.howmuchismyhotwheels.valuation.service.ValuationService;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
@@ -31,23 +33,48 @@ public class HotWheelsController {
     }
 
     @GetMapping("/cars/{year}")
-    public ResponseEntity<List<HotWheelsCar>> getCarsByYear(@PathVariable Integer year) {
-        return ResponseEntity.ok(carRepository.findByReleaseYearOrderByNameAsc(year));
+    public ResponseEntity<?> getCarsByYear(@PathVariable Integer year) {
+        List<HotWheelsCar> cars = carRepository.findByReleaseYearOrderByNameAsc(year);
+        if (cars.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Nie znaleziono samochodzików dla roku: " + year));
+        }
+        return ResponseEntity.ok(cars);
     }
 
-    @GetMapping("/valuation/{carId}")
-    public ResponseEntity<FullCarDetailsResponse> getCarValuation(@PathVariable String carId) {
-        return carRepository.findById(carId)
-                .map(car -> {
-                    ValuationResponse valuation = valuationService.getValuationForCar(carId);
+    @GetMapping("/namevaluation/{hotWheelsName}")
+    public ResponseEntity<?> getCarsByName(@PathVariable String hotWheelsName) {
+        List<HotWheelsCar> cars = valuationService.findCarsByName(hotWheelsName);
+        if (cars.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Nie znaleziono samochodzików pasujących do nazwy: " + hotWheelsName));
+        }
+        return ResponseEntity.ok(cars);
+    }
 
-                    FullCarDetailsResponse response = FullCarDetailsResponse.builder()
-                            .car(car)
-                            .valuation(valuation)
-                            .build();
+    @GetMapping("/valuation/{identifier}")
+    public ResponseEntity<?> getValuation(@PathVariable String identifier) {
+        if ("max".equalsIgnoreCase(identifier) || "min".equalsIgnoreCase(identifier)) {
+            Optional<FullCarDetailsResponse> extremeValuation = valuationService.getExtremeValuation(identifier);
+            if (extremeValuation.isPresent()) {
+                return ResponseEntity.ok(extremeValuation.get());
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Nie można ustalić wyceny typu: " + identifier));
+            }
+        }
 
-                    return ResponseEntity.ok(response);
-                })
-                .orElse(ResponseEntity.notFound().build());
+        Optional<HotWheelsCar> carOpt = carRepository.findById(identifier);
+        if (carOpt.isPresent()) {
+            ValuationResponse valuation = valuationService.getValuationForCar(identifier);
+            FullCarDetailsResponse response = FullCarDetailsResponse.builder()
+                    .car(carOpt.get())
+                    .valuation(valuation)
+                    .build();
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Nie znaleziono samochodzika o ID: " + identifier));
+        }
     }
 }

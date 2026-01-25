@@ -13,9 +13,9 @@ public interface HotWheelsCarRepository extends MongoRepository<HotWheelsCar, St
     Optional<HotWheelsCar> findByName(String name);
     boolean existsByToyId(String toyId);
     boolean existsByNameAndReleaseYear(String name, Integer releaseYear);
-
-
     List<HotWheelsCar> findByReleaseYearOrderByNameAsc(Integer releaseYear);
+
+    List<HotWheelsCar> findByNameContainingIgnoreCase(String name);
 
     @Aggregation(pipeline = {
             "{ '$group': { '_id': '$releaseYear' } }",

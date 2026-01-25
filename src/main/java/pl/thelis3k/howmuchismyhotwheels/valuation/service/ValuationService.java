@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import pl.thelis3k.howmuchismyhotwheels.controller.dto.FullCarDetailsResponse;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.model.HotWheelsCar;
 import pl.thelis3k.howmuchismyhotwheels.hotwheels.repository.HotWheelsCarRepository;
 import pl.thelis3k.howmuchismyhotwheels.scrapper.engine.EbayScraper;
@@ -19,6 +20,7 @@ import pl.thelis3k.howmuchismyhotwheels.valuation.model.ValuationSource;
 import pl.thelis3k.howmuchismyhotwheels.valuation.repository.CarValuationRepository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,6 +42,30 @@ public class ValuationService {
     @Autowired
     @Lazy
     private ValuationService self;
+
+    public List<HotWheelsCar> findCarsByName(String name) {
+        return carRepository.findByNameContainingIgnoreCase(name);
+    }
+
+    public Optional<FullCarDetailsResponse> getExtremeValuation(String type) {
+        Optional<CarValuation> valuationOpt;
+
+        if ("max".equalsIgnoreCase(type)) {
+            valuationOpt = valuationRepository.findTopByOrderBySmartAveragePriceDesc();
+        } else if ("min".equalsIgnoreCase(type)) {
+            valuationOpt = valuationRepository.findTopByOrderBySmartAveragePriceAsc();
+        } else {
+            throw new IllegalArgumentException("Invalid valuation type: " + type);
+        }
+
+        return valuationOpt.flatMap(val ->
+                carRepository.findById(val.getHotWheelsCarId())
+                        .map(car -> FullCarDetailsResponse.builder()
+                                .car(car)
+                                .valuation(getValuationForCar(car.getId(), false))
+                                .build())
+        );
+    }
 
     public ValuationResponse getValuationForCar(String carId) {
         return getValuationForCar(carId, true);

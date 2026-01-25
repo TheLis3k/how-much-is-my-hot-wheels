@@ -16,4 +16,8 @@ public interface CarValuationRepository extends MongoRepository<CarValuation, St
     List<CarValuation> findAllByHotWheelsCarId(String hotWheelsCarId);
 
     void deleteByHotWheelsCarId(String hotWheelsCarId);
+
+    Optional<CarValuation> findTopByOrderBySmartAveragePriceDesc();
+
+    Optional<CarValuation> findTopByOrderBySmartAveragePriceAsc();
 }
