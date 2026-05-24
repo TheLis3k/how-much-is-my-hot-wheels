@@ -44,7 +44,7 @@ flowchart LR
     ValuationService --> CarRepo
     ValuationService --> ValRepo
 
-    Scheduler[ScrapingScheduler] -->|@Async| Scrapers
+    Scheduler[ScrapingScheduler] -->|async| Scrapers
     subgraph Scrapers[Scraping engines]
         Ebay[EbayScraper]
         Etsy[EtsyApiService]
